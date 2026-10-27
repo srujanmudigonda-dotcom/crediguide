@@ -1,7 +1,11 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  // Backend API address. Local development uses localhost; a hosted
+  // frontend sets VITE_API_URL in its environment (e.g. Vercel) to
+  // the deployed backend's /api address.
+  baseURL:
+    import.meta.env.VITE_API_URL || "http://localhost:5000/api",
   headers: {
     "Content-Type": "application/json",
   },

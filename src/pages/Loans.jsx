@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { notify } from "../utils/notify";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import api from "../services/api";
@@ -675,7 +676,7 @@ function Loans() {
             : "0";
 
         if (response.score) {
-          alert(
+          notify(
             `Payment recorded successfully.\n\n` +
               `Payment status: ${
                 paymentData.status
@@ -686,7 +687,7 @@ function Loans() {
               }`
           );
         } else {
-          alert(
+          notify(
             "Payment recorded successfully."
           );
         }

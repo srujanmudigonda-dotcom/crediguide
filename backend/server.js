@@ -3,6 +3,9 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 
 const connectDB = require("./config/db");
+const {
+  startDueReminderJob,
+} = require("./jobs/dueReminderJob");
 
 const authRoutes = require("./routes/authRoutes");
 const creditScoreRoutes = require("./routes/creditScoreRoutes");
@@ -24,11 +27,47 @@ const PORT = process.env.PORT || 5000;
 
 connectDB();
 
+// Daily due-date reminder scan (in-app notification + SMS).
+startDueReminderJob();
+
+// CLIENT_URL may hold one origin or a comma-separated list, so the
+// same backend can serve local development and the hosted frontend.
+const allowedOrigins = (
+  process.env.CLIENT_URL || "http://localhost:5173"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+// A request is allowed when its origin is on the CLIENT_URL list,
+// or when it is one of this project's own Vercel deployments
+// (production and preview addresses all end in .vercel.app and
+// change from deploy to deploy, so they cannot be listed by hand).
+const isAllowedOrigin = (origin) => {
+  if (!origin) {
+    return true;
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  try {
+    return new URL(origin).hostname.endsWith(".vercel.app");
+  } catch (error) {
+    return false;
+  }
+};
+
 app.use(
   cors({
-    origin:
-      process.env.CLIENT_URL ||
-      "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );

@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const { sendOTPViaMSG91 } = require("../services/msg91Service");
+const { sendOTP: dispatchSMSOTP } = require("../services/smsService");
 
 // ==========================================
 // GENERATE OTP
@@ -23,28 +23,54 @@ const generateToken = (userId) => {
 
 // ==========================================
 // SEND OTP
-// Development mode:
+// Delegates to the SMS dispatcher
+// (services/smsService.js):
 // - DEV_OTP_MODE=true -> OTP printed in terminal
-// - DEV_OTP_MODE=false -> OTP sent through MSG91
+// - DEV_OTP_MODE=false -> real SMS via SMS_PROVIDER
+//   (fast2sms by default, msg91 legacy)
 // ==========================================
 const sendOTP = async (mobileNumber, otp, email, type) => {
-  if (process.env.DEV_OTP_MODE === "true") {
+  const result = await dispatchSMSOTP(mobileNumber, otp);
+
+  if (result.developmentMode) {
     console.log(
       `DEVELOPMENT ${type} OTP for ${email}: ${otp}`
     );
-
-    return {
-      success: true,
-      developmentMode: true,
-    };
   }
 
-  await sendOTPViaMSG91(mobileNumber, otp);
+  return result;
+};
 
-  return {
-    success: true,
-    developmentMode: false,
-  };
+// ==========================================
+// FIND USER BY IDENTIFIER
+// Login and password reset accept either the
+// account email or the registered mobile number.
+// ==========================================
+const findUserByIdentifier = async (identifier) => {
+  const value = String(identifier || "").trim();
+
+  if (!value) {
+    return null;
+  }
+
+  if (value.includes("@")) {
+    return User.findOne({
+      email: value.toLowerCase(),
+    });
+  }
+
+  const cleanedMobileNumber = value.replace(/\D/g, "");
+
+  // Accept numbers typed with the 91 country code too.
+  const tenDigit = cleanedMobileNumber.length > 10
+    ? cleanedMobileNumber.slice(-10)
+    : cleanedMobileNumber;
+
+  if (tenDigit) {
+    return User.findOne({ mobileNumber: tenDigit });
+  }
+
+  return null;
 };
 
 // ==========================================
@@ -243,6 +269,10 @@ const verifyOTP = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Account verified successfully.",
+      // The user has just proved ownership of the account with the
+      // OTP, so log them straight in instead of sending them back
+      // to the login page.
+      token: generateToken(user._id),
       user: {
         id: user._id,
         fullName: user.fullName,
@@ -355,28 +385,30 @@ const resendOTP = async (req, res) => {
 
 // ==========================================
 // LOGIN
+// Email or mobile number + the password set at
+// registration. OTP is not asked again here:
+// it verifies registration and password resets.
 // ==========================================
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, email, mobileNumber, password } = req.body;
 
-    if (!email || !password) {
+    const loginIdentifier = identifier || email || mobileNumber;
+
+    if (!loginIdentifier || !password) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required.",
+        message:
+          "Please provide your email or mobile number and password.",
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const user = await User.findOne({
-      email: normalizedEmail,
-    });
+    const user = await findUserByIdentifier(loginIdentifier);
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password.",
+        message: "Invalid credentials.",
       });
     }
 
@@ -388,7 +420,7 @@ const loginUser = async (req, res) => {
     if (!passwordMatch) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password.",
+        message: "Invalid credentials.",
       });
     }
 
@@ -396,60 +428,26 @@ const loginUser = async (req, res) => {
       return res.status(403).json({
         success: false,
         message:
-          "Please verify your account before logging in.",
+          "Please verify your account with the OTP sent to your mobile number before logging in.",
+        requiresRegistrationVerification: true,
+        email: user.email,
       });
     }
 
-    if (!user.mobileNumber) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "No mobile number is associated with this account.",
-      });
-    }
-
-    const otp = generateOTP();
-
-    user.otp = otp;
-    user.otpExpiresAt = new Date(
-      Date.now() + 10 * 60 * 1000
-    );
-
-    await user.save();
-
-    try {
-      await sendOTP(
-        user.mobileNumber,
-        otp,
-        normalizedEmail,
-        "LOGIN"
-      );
-    } catch (smsError) {
-      console.error(
-        "Login OTP failed:",
-        smsError.message
-      );
-
+    // Clear any stale OTP left over from earlier flows.
+    if (user.otp || user.otpExpiresAt) {
       user.otp = null;
       user.otpExpiresAt = null;
 
       await user.save();
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "Unable to send login OTP. Please try again.",
-      });
     }
 
-    console.log(
-      `Login OTP sent to ${normalizedEmail}`
-    );
+    const token = generateToken(user._id);
 
     return res.status(200).json({
       success: true,
-      message:
-        "Login OTP sent to your mobile number.",
+      message: "Login successful.",
+      token,
       user: {
         id: user._id,
         fullName: user.fullName,
@@ -546,6 +544,178 @@ const verifyLoginOTP = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Unable to verify login OTP.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// FORGOT PASSWORD - REQUEST OTP
+// Sends a one-time password to the registered
+// mobile number by SMS.
+// ==========================================
+const forgotPassword = async (req, res) => {
+  try {
+    const { identifier, email, mobileNumber } = req.body;
+
+    const loginIdentifier = identifier || email || mobileNumber;
+
+    if (!loginIdentifier) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please provide your email or mobile number.",
+      });
+    }
+
+    const user = await findUserByIdentifier(loginIdentifier);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found for the given details.",
+      });
+    }
+
+    if (!user.mobileNumber) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No mobile number is associated with this account.",
+      });
+    }
+
+    const otp = generateOTP();
+
+    user.otp = otp;
+    user.otpExpiresAt = new Date(
+      Date.now() + 10 * 60 * 1000
+    );
+
+    await user.save();
+
+    try {
+      await sendOTP(
+        user.mobileNumber,
+        otp,
+        user.email,
+        "PASSWORD RESET"
+      );
+    } catch (smsError) {
+      console.error(
+        "Password reset OTP failed:",
+        smsError.message
+      );
+
+      user.otp = null;
+      user.otpExpiresAt = null;
+
+      await user.save();
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Unable to send the password reset OTP. Please try again.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "An OTP has been sent to your registered mobile number.",
+      email: user.email,
+    });
+  } catch (error) {
+    console.error("Forgot Password Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to process the password reset request.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// RESET PASSWORD - VERIFY OTP AND SET NEW
+// ==========================================
+const resetPassword = async (req, res) => {
+  try {
+    const {
+      identifier,
+      email,
+      mobileNumber,
+      otp,
+      newPassword,
+    } = req.body;
+
+    const loginIdentifier = identifier || email || mobileNumber;
+
+    if (!loginIdentifier || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please provide your details, the OTP and a new password.",
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must contain at least 6 characters.",
+      });
+    }
+
+    const user = await findUserByIdentifier(loginIdentifier);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found for the given details.",
+      });
+    }
+
+    if (!user.otp || !user.otpExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No active OTP found. Please request a new OTP.",
+      });
+    }
+
+    if (new Date() > user.otpExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "OTP has expired. Please request a new OTP.",
+      });
+    }
+
+    if (String(otp).trim() !== String(user.otp).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP.",
+      });
+    }
+
+    user.password = await bcrypt.hash(String(newPassword), 10);
+    user.otp = null;
+    user.otpExpiresAt = null;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Password reset successful. Please login with your new password.",
+    });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to reset the password.",
       error: error.message,
     });
   }
@@ -663,6 +833,8 @@ module.exports = {
   resendOTP,
   loginUser,
   verifyLoginOTP,
+  forgotPassword,
+  resetPassword,
   getProfile,
   updateProfile,
 };
