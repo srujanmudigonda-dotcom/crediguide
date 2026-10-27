@@ -1,0 +1,27 @@
+# CrediGuide backend on Render (https://render.com)
+# Srujan: New + -> Blueprint -> pick this repo -> Apply.
+# Then set the secret values (sync: false) in the Render dashboard
+# from the team's backend/.env, and set CLIENT_URL to the Vercel
+# site address. Finally set VITE_API_URL in Vercel to
+# https://<this-service>.onrender.com/api and redeploy the frontend.
+services:
+  - type: web
+    name: crediguide-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FAST2SMS_API_KEY
+        sync: false
+      - key: SMS_PROVIDER
+        value: fast2sms
+      - key: DEV_OTP_MODE
+        value: "false"
+      - key: CLIENT_URL
+        sync: false

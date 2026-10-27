@@ -65,6 +65,10 @@ const verifyOTP = async (email, otp) => {
     }
   );
 
+  // Registration verification now returns a session token:
+  // store it so the user lands logged-in.
+  storeSession(response.data);
+
   return response.data;
 };
 

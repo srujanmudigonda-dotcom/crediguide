@@ -21,6 +21,7 @@ import Profile from "./pages/Profile";
 import FinancialChatbot from "./pages/FinancialChatbot";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import ToastHost from "./components/ToastHost";
 
 function App() {
   return (
@@ -154,6 +155,7 @@ function App() {
           }
         />
       </Routes>
+      <ToastHost />
     </BrowserRouter>
   );
 }

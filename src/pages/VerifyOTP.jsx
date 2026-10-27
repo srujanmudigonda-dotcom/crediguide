@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { notify } from "../utils/notify";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -24,7 +25,7 @@ function VerifyOTP() {
     event.preventDefault();
 
     if (!email) {
-      alert(
+      notify(
         "Email information is missing. Please register again."
       );
 
@@ -33,7 +34,7 @@ function VerifyOTP() {
     }
 
     if (!/^\d{6}$/.test(otp)) {
-      alert("Please enter the 6-digit OTP.");
+      notify("Please enter the 6-digit OTP.");
       return;
     }
 
@@ -46,7 +47,7 @@ function VerifyOTP() {
       );
 
       if (!response?.success) {
-        alert(
+        notify(
           response?.message ||
             "OTP verification failed."
         );
@@ -54,18 +55,18 @@ function VerifyOTP() {
         return;
       }
 
-      alert(
-        "Mobile number verified successfully. Please login with your email or mobile number and password."
+      notify(
+        "Mobile number verified successfully. You are now logged in."
       );
 
-      navigate("/login");
+      navigate("/dashboard");
     } catch (error) {
       console.error(
         "OTP Verification Error:",
         error
       );
 
-      alert(
+      notify(
         error.response?.data?.message ||
           "Unable to verify OTP. Please try again."
       );
@@ -82,7 +83,7 @@ function VerifyOTP() {
 
   const handleResendOTP = async () => {
     if (!email) {
-      alert(
+      notify(
         "Email information is missing. Please register again."
       );
 
@@ -97,11 +98,11 @@ function VerifyOTP() {
         await resendOTP(email);
 
       if (response?.success) {
-        alert(
+        notify(
           "A new OTP has been sent to your mobile number."
         );
       } else {
-        alert(
+        notify(
           response?.message ||
             "Failed to resend OTP."
         );
@@ -112,7 +113,7 @@ function VerifyOTP() {
         error
       );
 
-      alert(
+      notify(
         error.response?.data?.message ||
           "Unable to resend OTP. Please try again."
       );

@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { notify } from "../utils/notify";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -47,7 +48,7 @@ function Register() {
       !password ||
       !confirmPassword
     ) {
-      alert("Please fill in all required fields.");
+      notify("Please fill in all required fields.");
       return;
     }
 
@@ -59,21 +60,21 @@ function Register() {
         cleanedMobileNumber
       )
     ) {
-      alert(
+      notify(
         "Please enter a valid 10-digit Indian mobile number."
       );
       return;
     }
 
     if (password.length < 6) {
-      alert(
+      notify(
         "Password must contain at least 6 characters."
       );
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match.");
+      notify("Passwords do not match.");
       return;
     }
 
@@ -86,7 +87,7 @@ function Register() {
       score < 300 ||
       score > 900
     ) {
-      alert(
+      notify(
         "Please enter a valid CIBIL score between 300 and 900."
       );
       return;
@@ -104,14 +105,14 @@ function Register() {
       });
 
       if (!response.success) {
-        alert(
+        notify(
           response.message ||
             "Registration failed."
         );
         return;
       }
 
-      alert(
+      notify(
         `Account created successfully.\n\nDevelopment OTP: ${
           response.otp ||
           response.developmentOTP ||
@@ -132,7 +133,7 @@ function Register() {
         error
       );
 
-      alert(
+      notify(
         error.response?.data?.message ||
           "Unable to create account. Please try again."
       );

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { notify } from "../utils/notify";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -23,7 +24,7 @@ function ForgotPassword() {
     event.preventDefault();
 
     if (!identifier.trim()) {
-      alert("Please enter your email or mobile number.");
+      notify("Please enter your email or mobile number.");
       return;
     }
 
@@ -35,14 +36,14 @@ function ForgotPassword() {
       );
 
       if (!response?.success) {
-        alert(
+        notify(
           response?.message ||
             "Unable to send the OTP. Please try again."
         );
         return;
       }
 
-      alert(
+      notify(
         "An OTP has been sent to your registered mobile number."
       );
 
@@ -50,7 +51,7 @@ function ForgotPassword() {
     } catch (error) {
       console.error("Forgot Password Error:", error);
 
-      alert(
+      notify(
         error.response?.data?.message ||
           "Unable to send the OTP. Please try again."
       );
@@ -69,17 +70,17 @@ function ForgotPassword() {
     event.preventDefault();
 
     if (!/^\d{6}$/.test(otp.trim())) {
-      alert("Please enter the 6-digit OTP.");
+      notify("Please enter the 6-digit OTP.");
       return;
     }
 
     if (newPassword.length < 6) {
-      alert("Password must contain at least 6 characters.");
+      notify("Password must contain at least 6 characters.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      alert("New password and confirm password do not match.");
+      notify("New password and confirm password do not match.");
       return;
     }
 
@@ -93,14 +94,14 @@ function ForgotPassword() {
       });
 
       if (!response?.success) {
-        alert(
+        notify(
           response?.message ||
             "Unable to reset the password. Please try again."
         );
         return;
       }
 
-      alert(
+      notify(
         "Password reset successful. Please login with your new password."
       );
 
@@ -108,7 +109,7 @@ function ForgotPassword() {
     } catch (error) {
       console.error("Reset Password Error:", error);
 
-      alert(
+      notify(
         error.response?.data?.message ||
           "Unable to reset the password. Please try again."
       );

@@ -30,11 +30,18 @@ connectDB();
 // Daily due-date reminder scan (in-app notification + SMS).
 startDueReminderJob();
 
+// CLIENT_URL may hold one origin or a comma-separated list, so the
+// same backend can serve local development and the hosted frontend.
+const allowedOrigins = (
+  process.env.CLIENT_URL || "http://localhost:5173"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin:
-      process.env.CLIENT_URL ||
-      "http://localhost:5173",
+    origin: allowedOrigins,
     credentials: true,
   })
 );

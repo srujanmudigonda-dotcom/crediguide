@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { notify } from "../utils/notify";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -14,7 +15,7 @@ function Login() {
     event.preventDefault();
 
     if (!identifier.trim() || !password) {
-      alert(
+      notify(
         "Please enter your email or mobile number and password."
       );
       return;
@@ -29,7 +30,7 @@ function Login() {
       });
 
       if (!response?.success) {
-        alert(response?.message || "Login failed.");
+        notify(response?.message || "Login failed.");
         return;
       }
 
@@ -41,7 +42,7 @@ function Login() {
         error.response?.data?.message ||
         "Unable to login. Please check your details and password.";
 
-      alert(message);
+      notify(message);
 
       // Account exists but its registration OTP was never
       // verified: send the user to the OTP verification screen.

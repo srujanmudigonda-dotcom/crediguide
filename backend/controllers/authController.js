@@ -269,6 +269,10 @@ const verifyOTP = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Account verified successfully.",
+      // The user has just proved ownership of the account with the
+      // OTP, so log them straight in instead of sending them back
+      // to the login page.
+      token: generateToken(user._id),
       user: {
         id: user._id,
         fullName: user.fullName,

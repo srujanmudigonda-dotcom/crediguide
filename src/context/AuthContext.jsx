@@ -232,10 +232,21 @@ export const AuthProvider = ({ children }) => {
     email,
     otp
   ) => {
-    return await authService.verifyOTP(
-      email,
-      otp
-    );
+    const response =
+      await authService.verifyOTP(
+        email,
+        otp
+      );
+
+    if (
+      response?.success &&
+      response?.token
+    ) {
+      setUser(response.user);
+      setIsAuthenticated(true);
+    }
+
+    return response;
   };
 
   /*
