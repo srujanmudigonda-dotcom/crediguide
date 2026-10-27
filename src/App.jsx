@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyOTP from "./pages/VerifyOTP";
 import ForgotPassword from "./pages/ForgotPassword";
+import Landing from "./pages/Landing";
 
 import Dashboard from "./pages/Dashboard";
 import Payments from "./pages/Payments";
@@ -26,7 +27,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Authentication */}
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
