@@ -139,18 +139,27 @@ export const AuthProvider = ({ children }) => {
   | Login - Step 1
   |--------------------------------------------------------------------------
   |
-  | Sends email + password to backend.
-  | Backend generates login OTP.
-  |
-  | IMPORTANT:
-  | No JWT is stored here.
+  | Sends email or mobile number + password to the backend.
+  | The backend returns the JWT directly on success
+  | and the session is stored here.
   |
   */
 
   const login = async (credentials) => {
-    return await authService.login(
-      credentials
-    );
+    const response =
+      await authService.login(
+        credentials
+      );
+
+    if (
+      response?.success &&
+      response?.token
+    ) {
+      setUser(response.user);
+      setIsAuthenticated(true);
+    }
+
+    return response;
   };
 
   /*
@@ -247,6 +256,31 @@ export const AuthProvider = ({ children }) => {
   |--------------------------------------------------------------------------
   */
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | Forgot Password
+  |--------------------------------------------------------------------------
+  */
+
+  const forgotPassword = async (identifier) => {
+    return await authService.forgotPassword(
+      identifier
+    );
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Reset Password
+  |--------------------------------------------------------------------------
+  */
+
+  const resetPassword = async (resetData) => {
+    return await authService.resetPassword(
+      resetData
+    );
+  };
+
   const logout = () => {
     authService.logout();
 
@@ -267,6 +301,8 @@ export const AuthProvider = ({ children }) => {
 
     login,
     verifyLoginOTP,
+    forgotPassword,
+    resetPassword,
 
     register,
     verifyOTP,

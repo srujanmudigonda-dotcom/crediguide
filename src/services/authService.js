@@ -6,6 +6,41 @@ import api from "./api";
 |--------------------------------------------------------------------------
 */
 
+/*
+|--------------------------------------------------------------------------
+| Store Session
+|--------------------------------------------------------------------------
+|
+| Persists the JWT and user returned by a successful login
+| (password login or the legacy OTP login, whichever issued it).
+|
+*/
+
+const storeSession = (data) => {
+  if (data?.success && data?.token) {
+    localStorage.setItem(
+      "creditGuideToken",
+      data.token
+    );
+
+    localStorage.setItem(
+      "creditGuideUser",
+      JSON.stringify(data.user)
+    );
+
+    localStorage.setItem(
+      "creditGuideLoggedIn",
+      "true"
+    );
+  }
+};
+
+/*
+|--------------------------------------------------------------------------
+| Register
+|--------------------------------------------------------------------------
+*/
+
 const register = async (userData) => {
   const response = await api.post(
     "/auth/register",
@@ -65,6 +100,9 @@ const login = async (credentials) => {
     credentials
   );
 
+  // Password login now returns the JWT directly.
+  storeSession(response.data);
+
   return response.data;
 };
 
@@ -86,25 +124,7 @@ const verifyLoginOTP = async (email, otp) => {
     }
   );
 
-  if (
-    response.data?.success &&
-    response.data?.token
-  ) {
-    localStorage.setItem(
-      "creditGuideToken",
-      response.data.token
-    );
-
-    localStorage.setItem(
-      "creditGuideUser",
-      JSON.stringify(response.data.user)
-    );
-
-    localStorage.setItem(
-      "creditGuideLoggedIn",
-      "true"
-    );
-  }
+  storeSession(response.data);
 
   return response.data;
 };
@@ -164,12 +184,54 @@ const logout = () => {
 |--------------------------------------------------------------------------
 */
 
+/*
+|--------------------------------------------------------------------------
+| Forgot Password - Request OTP
+|--------------------------------------------------------------------------
+|
+| Accepts the account email or mobile number; the backend sends
+| the reset OTP to the registered mobile number by SMS.
+|
+*/
+
+const forgotPassword = async (identifier) => {
+  const response = await api.post(
+    "/auth/forgot-password",
+    { identifier }
+  );
+
+  return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Reset Password - Verify OTP and Set New Password
+|--------------------------------------------------------------------------
+*/
+
+const resetPassword = async (resetData) => {
+  const response = await api.post(
+    "/auth/reset-password",
+    resetData
+  );
+
+  return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Export
+|--------------------------------------------------------------------------
+*/
+
 const authService = {
   register,
   verifyOTP,
   resendOTP,
   login,
   verifyLoginOTP,
+  forgotPassword,
+  resetPassword,
   getProfile,
   updateProfile,
   logout,

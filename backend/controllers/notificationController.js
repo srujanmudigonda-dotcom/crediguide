@@ -1,5 +1,8 @@
 
 const Notification = require("../models/Notification");
+const {
+  runDueReminderScan,
+} = require("../services/dueReminderService");
 const Loan = require("../models/Loan");
 
 /* -------------------- Get Notifications -------------------- */
@@ -191,8 +194,42 @@ const createPaymentReminders = async (req, res) => {
   }
 };
 
+/*
+|--------------------------------------------------------------------------
+| Run Due Reminder Scan (manual trigger)
+|--------------------------------------------------------------------------
+|
+| Runs the same scan the daily cron job runs, limited to the
+| requesting user, and returns how many in-app notifications were
+| created and how many SMS reminders were sent.
+|
+*/
+
+const runDueReminders = async (req, res) => {
+  try {
+    const summary = await runDueReminderScan({
+      onlyUserId: req.user.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Due reminder scan completed.",
+      summary,
+    });
+  } catch (error) {
+    console.error("Run Due Reminders Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to run the due reminder scan.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getNotifications,
   markNotificationAsRead,
   createPaymentReminders,
+  runDueReminders,
 };

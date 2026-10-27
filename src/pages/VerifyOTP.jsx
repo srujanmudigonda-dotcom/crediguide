@@ -55,7 +55,7 @@ function VerifyOTP() {
       }
 
       alert(
-        "Email verified successfully. Please login with your email and password."
+        "Mobile number verified successfully. Please login with your email or mobile number and password."
       );
 
       navigate("/login");
@@ -98,10 +98,7 @@ function VerifyOTP() {
 
       if (response?.success) {
         alert(
-          `New OTP generated successfully.\n\nDevelopment OTP: ${
-            response.developmentOTP ||
-            "Check the backend console."
-          }`
+          "A new OTP has been sent to your mobile number."
         );
       } else {
         alert(

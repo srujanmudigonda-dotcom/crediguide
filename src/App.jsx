@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyOTP from "./pages/VerifyOTP";
+import ForgotPassword from "./pages/ForgotPassword";
 
 import Dashboard from "./pages/Dashboard";
 import Payments from "./pages/Payments";
@@ -29,6 +30,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Main Application */}
         <Route
