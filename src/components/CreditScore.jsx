@@ -1,37 +1,66 @@
 import { useEffect, useState } from "react";
-import { getCreditScore } from "../services/creditService";
+import api from "../services/api";
 
 function CreditScore() {
-  const [creditData, setCreditData] = useState(null);
+  const [simulator, setSimulator] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadCreditScore = async () => {
+    let mounted = true;
+
+    const loadScore = async () => {
       try {
         setLoading(true);
         setError("");
 
-        const response = await getCreditScore();
+        /*
+         * Load the same simulated CIBIL score data used
+         * by the score-history system.
+         */
+        const response = await api.get("/cibil-simulator");
 
-        if (response.success) {
-          setCreditData(response);
+        if (!mounted) return;
+
+        const data = response?.data;
+
+        if (data?.success && data?.simulator) {
+          setSimulator(data.simulator);
+        } else if (data?.simulator) {
+          setSimulator(data.simulator);
         } else {
-          setError(response.message || "Unable to load credit score.");
+          setSimulator(null);
+          setError(
+            data?.message ||
+              "Your simulated credit score is not available yet."
+          );
         }
-      } catch (err) {
-        console.error("Credit Score Error:", err);
+      } catch (error) {
+        if (!mounted) return;
+
+        console.error(
+          "Simulated Credit Score Error:",
+          error
+        );
+
+        setSimulator(null);
 
         setError(
-          err.response?.data?.message ||
-            "Unable to load credit score."
+          error.response?.data?.message ||
+            "Unable to load your simulated credit score."
         );
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    loadCreditScore();
+    loadScore();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (loading) {
@@ -40,8 +69,9 @@ function CreditScore() {
         <div className="flex min-h-[380px] items-center justify-center">
           <div className="text-center">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+
             <p className="mt-4 text-sm font-medium text-gray-500">
-              Loading credit score...
+              Loading simulated credit score...
             </p>
           </div>
         </div>
@@ -49,87 +79,162 @@ function CreditScore() {
     );
   }
 
-  if (error || !creditData) {
+  if (!simulator) {
     return (
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex min-h-[380px] items-center justify-center">
-          <div className="rounded-lg bg-red-50 p-5 text-center">
-            <h3 className="text-lg font-semibold text-red-700">
-              Credit Score
+          <div className="max-w-md text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
+              <span className="text-3xl font-bold text-blue-600">
+                S
+              </span>
+            </div>
+
+            <h3 className="mt-5 text-xl font-semibold text-gray-800">
+              Simulated Credit Score
             </h3>
 
-            <p className="mt-2 text-sm text-red-600">
-              {error || "Credit score data is unavailable."}
+            <p className="mt-3 text-sm leading-6 text-gray-500">
+              Your simulated credit score will appear here after
+              your starting score and payment behavior are recorded.
             </p>
+
+            {error && (
+              <p className="mt-3 text-xs text-gray-400">
+                {error}
+              </p>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  const score = Number(creditData.score);
-  const minScore = Number(creditData.range?.min) || 300;
-  const maxScore = Number(creditData.range?.max) || 900;
+  /*
+   * IMPORTANT:
+   * Use currentScore directly from the simulator.
+   * Do NOT default to 300 when a valid score exists.
+   */
+  const score = Number(simulator.currentScore);
 
-  const percentage = Math.max(
-    0,
-    Math.min(
-      100,
-      ((score - minScore) / (maxScore - minScore)) * 100
-    )
+  const startingScore = Number(
+    simulator.startingScore
   );
 
-  const status = creditData.status || "Unknown";
+  const safeScore =
+    Number.isFinite(score) && score >= 300
+      ? Math.min(score, 900)
+      : 300;
+
+  const safeStartingScore =
+    Number.isFinite(startingScore) &&
+    startingScore >= 300
+      ? Math.min(startingScore, 900)
+      : safeScore;
+
+  const minScore = 300;
+  const maxScore = 900;
+
+  const percentage =
+    ((safeScore - minScore) /
+      (maxScore - minScore)) *
+    100;
+
+  const getScoreStatus = (value) => {
+    if (value >= 800) return "Excellent";
+    if (value >= 750) return "Very Good";
+    if (value >= 700) return "Good";
+    if (value >= 650) return "Fair";
+    return "Needs Improvement";
+  };
+
+  const status = getScoreStatus(safeScore);
 
   const statusClass =
     status === "Excellent"
-      ? "bg-green-100 text-green-600"
+      ? "bg-green-100 text-green-700"
+      : status === "Very Good"
+      ? "bg-emerald-100 text-emerald-700"
       : status === "Good"
-      ? "bg-green-100 text-green-600"
+      ? "bg-blue-100 text-blue-700"
       : status === "Fair"
-      ? "bg-yellow-100 text-yellow-600"
-      : "bg-red-100 text-red-600";
+      ? "bg-yellow-100 text-yellow-700"
+      : "bg-red-100 text-red-700";
 
   const statusTextClass =
     status === "Excellent"
       ? "text-green-600"
+      : status === "Very Good"
+      ? "text-emerald-600"
       : status === "Good"
-      ? "text-green-600"
+      ? "text-blue-600"
       : status === "Fair"
       ? "text-yellow-600"
       : "text-red-600";
 
-  const formattedDate = creditData.lastUpdated
-    ? new Date(creditData.lastUpdated).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "Recently";
+  const scoreChange =
+    safeScore - safeStartingScore;
+
+  const scoreChangeText =
+    scoreChange > 0
+      ? `+${scoreChange}`
+      : scoreChange;
+
+  const scoreChangeClass =
+    scoreChange > 0
+      ? "text-green-600"
+      : scoreChange < 0
+      ? "text-red-600"
+      : "text-gray-500";
+
+  const history = simulator.scoreHistory || [];
+
+  const latestHistory =
+    history.length > 0
+      ? history[history.length - 1]
+      : null;
+
+  const formattedDate =
+    latestHistory?.date
+      ? new Date(
+          latestHistory.date
+        ).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : simulator.updatedAt
+      ? new Date(
+          simulator.updatedAt
+        ).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "Recently";
 
   /*
-    SVG semicircle:
-    radius = 100
-    semicircle length = PI * 100
-  */
+   * Semicircle gauge
+   */
   const radius = 100;
-  const circumference = Math.PI * radius;
+  const circumference =
+    Math.PI * radius;
 
   const progressOffset =
-    circumference - (percentage / 100) * circumference;
+    circumference -
+    (percentage / 100) *
+      circumference;
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm">
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-700">
-            Credit Score
+            Simulated Credit Score
           </h3>
 
           <p className="mt-1 text-sm text-gray-400">
-            Your latest credit score
+            Based on your starting score and payment behavior
           </p>
         </div>
 
@@ -140,14 +245,11 @@ function CreditScore() {
         </span>
       </div>
 
-      {/* Speedometer */}
       <div className="relative mx-auto mt-6 h-[220px] w-full max-w-[360px]">
-
         <svg
           viewBox="0 0 240 140"
           className="h-full w-full overflow-visible"
         >
-          {/* Background arc */}
           <path
             d="M 20 120 A 100 100 0 0 1 220 120"
             fill="none"
@@ -156,7 +258,6 @@ function CreditScore() {
             strokeLinecap="round"
           />
 
-          {/* Score progress arc */}
           <path
             d="M 20 120 A 100 100 0 0 1 220 120"
             fill="none"
@@ -167,7 +268,6 @@ function CreditScore() {
             strokeDashoffset={progressOffset}
           />
 
-          {/* Minimum label */}
           <text
             x="18"
             y="137"
@@ -175,10 +275,9 @@ function CreditScore() {
             fill="#9ca3af"
             textAnchor="start"
           >
-            {minScore}
+            300
           </text>
 
-          {/* Maximum label */}
           <text
             x="222"
             y="137"
@@ -186,14 +285,13 @@ function CreditScore() {
             fill="#9ca3af"
             textAnchor="end"
           >
-            {maxScore}
+            900
           </text>
         </svg>
 
-        {/* Center score */}
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-center">
           <p className="text-5xl font-bold text-gray-800">
-            {score}
+            {safeScore}
           </p>
 
           <p
@@ -204,30 +302,48 @@ function CreditScore() {
         </div>
       </div>
 
-      {/* Score Range */}
       <div className="mt-1 flex justify-between px-8 text-xs text-gray-400">
-        <span>{minScore}</span>
-        <span>{maxScore}</span>
+        <span>300</span>
+        <span>900</span>
       </div>
 
-      {/* Status */}
-      <div className="mt-5 rounded-lg bg-blue-50 p-3 text-center">
-        <p className="text-sm font-medium text-blue-700">
-          Credit score range: {minScore} - {maxScore}
-        </p>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-gray-50 p-4 text-center">
+          <p className="text-xs font-medium text-gray-400">
+            Starting Score
+          </p>
 
-        <p className="mt-1 text-xs text-blue-500">
-          Updated {formattedDate}
+          <p className="mt-1 text-xl font-bold text-gray-700">
+            {safeStartingScore}
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-gray-50 p-4 text-center">
+          <p className="text-xs font-medium text-gray-400">
+            Score Change
+          </p>
+
+          <p
+            className={`mt-1 text-xl font-bold ${scoreChangeClass}`}
+          >
+            {scoreChangeText}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
+        <p className="text-xs leading-5 text-blue-700">
+          This is an educational score simulation. It is not your
+          actual TransUnion CIBIL score and does not use the
+          proprietary CIBIL scoring formula.
         </p>
       </div>
 
-      {/* Source */}
-      {creditData.source && (
-        <p className="mt-3 text-center text-xs text-gray-400">
-          Source: {creditData.source}
+      <div className="mt-4 text-center">
+        <p className="text-xs text-gray-400">
+          Last updated {formattedDate}
         </p>
-      )}
-
+      </div>
     </div>
   );
 }

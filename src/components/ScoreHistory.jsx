@@ -1,147 +1,149 @@
 import { useEffect, useState } from "react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { getScoreHistory } from "../services/creditService";
 
 function ScoreHistory() {
-  const [history, setHistory] = useState([]);
+  const [scoreHistory, setScoreHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const load = async () => {
+    const loadScoreHistory = async () => {
       try {
+        setLoading(true);
+        setError("");
+
         const response = await getScoreHistory();
 
-        if (response.success) {
-          setHistory(
-            (response.history || []).map((point) => ({
-              month: new Date(point.scoreDate).toLocaleDateString("en-IN", {
-                month: "short",
-              }),
-              score: point.score,
-            }))
-          );
+        if (response?.success) {
+          setScoreHistory(response.history || []);
         } else {
-          setError(response.message || "Unable to load score history.");
+          setScoreHistory([]);
+          setError(
+            response?.message ||
+              "Unable to load score history."
+          );
         }
-      } catch (err) {
-        console.error("Score History Error:", err);
-        setError("Unable to load score history.");
+      } catch (error) {
+        console.error("Score History Error:", error);
+
+        setScoreHistory([]);
+
+        setError(
+          error.response?.data?.message ||
+            "Unable to load score history."
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    load();
+    loadScoreHistory();
   }, []);
 
-  const currentScore =
-    history.length > 0 ? history[history.length - 1].score : null;
-  const change =
-    history.length > 1
-      ? history[history.length - 1].score - history[0].score
-      : null;
+  if (loading) {
+    return (
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex min-h-[260px] items-center justify-center">
+          <p className="text-sm text-gray-500">
+            Loading score history...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm">
-      {/* Header */}
-      <div className="mb-6">
+      <div>
         <h3 className="text-lg font-semibold text-gray-700">
-          Credit Score History
+          Score History
         </h3>
 
         <p className="mt-1 text-sm text-gray-400">
-          Track how your credit score has changed over time.
+          Track changes in your simulated credit score over time.
         </p>
       </div>
 
-      {loading && (
-        <div className="flex h-72 items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+      {error ? (
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-5">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
-      )}
-
-      {!loading && (error || history.length === 0) && (
-        <div className="flex h-72 items-center justify-center rounded-lg bg-gray-50 p-5 text-center">
+      ) : scoreHistory.length === 0 ? (
+        <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
           <p className="text-sm text-gray-500">
-            {error || "No score history is available for this account yet."}
+            No score history is available yet.
           </p>
         </div>
-      )}
-
-      {!loading && history.length > 0 && (
-        <>
-          {/* Chart */}
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={history}
-                margin={{
-                  top: 10,
-                  right: 20,
-                  left: 0,
-                  bottom: 5,
-                }}
+      ) : (
+        <div className="mt-6 space-y-3">
+          {[...scoreHistory]
+            .reverse()
+            .map((item, index) => (
+              <div
+                key={
+                  item._id ||
+                  `${item.date}-${item.action}-${index}`
+                }
+                className="rounded-xl border border-gray-200 p-4"
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {item.action}
+                    </p>
 
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    {item.loanName && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {item.loanName}
+                      </p>
+                    )}
 
-                <YAxis domain={[650, 800]} tick={{ fontSize: 12 }} />
+                    <p className="mt-1 text-xs text-gray-400">
+                      {item.date
+                        ? new Date(item.date).toLocaleString(
+                            "en-IN"
+                          )
+                        : "Date not available"}
+                    </p>
 
-                <Tooltip />
+                    {item.notes && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        {item.notes}
+                      </p>
+                    )}
+                  </div>
 
-                <Line
-                  type="monotone"
-                  dataKey="score"
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                  dot={{
-                    r: 5,
-                  }}
-                  activeDot={{
-                    r: 7,
-                  }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+                  <div className="text-left sm:text-right">
+                    <p
+                      className={`text-lg font-bold ${
+                        Number(item.change) > 0
+                          ? "text-green-600"
+                          : Number(item.change) < 0
+                          ? "text-red-600"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {Number(item.change) > 0 ? "+" : ""}
+                      {item.change}
+                    </p>
 
-          {/* Current Score */}
-          <div className="mt-5 flex items-center justify-between rounded-lg bg-blue-50 p-4">
-            <div>
-              <p className="text-sm text-gray-500">Current Score</p>
-
-              <p className="mt-1 text-2xl font-bold text-gray-800">
-                {currentScore}
-              </p>
-            </div>
-
-            {change !== null && (
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Change</p>
-
-                <p
-                  className={`mt-1 font-semibold ${
-                    change >= 0 ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {change >= 0 ? "+" : ""}
-                  {change} points
-                </p>
+                    <p className="text-sm text-gray-500">
+                      {item.previousScore} → {item.newScore}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </>
+            ))}
+        </div>
       )}
+
+      <div className="mt-6 border-t border-gray-100 pt-5">
+        <p className="text-xs leading-5 text-gray-400">
+          This is an educational CrediGuide simulation based on
+          your recorded payment behavior. It is not your actual
+          TransUnion CIBIL score or an official credit report.
+        </p>
+      </div>
     </div>
   );
 }
