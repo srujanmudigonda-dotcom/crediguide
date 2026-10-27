@@ -40,6 +40,8 @@ const postBulkV2 = async (payload) => {
           authorization: apiKey,
           "Content-Type": "application/json",
         },
+        // SMS gateways can be slow to answer; do not give up early.
+        timeout: 60000,
       }
     );
 

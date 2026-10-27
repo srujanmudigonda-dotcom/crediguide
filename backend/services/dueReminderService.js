@@ -11,10 +11,11 @@ const { sendNotificationSMS } = require("./smsService");
 | "run-due-reminders" endpoint. For every loan with reminders enabled
 | it checks the days left until the due date and acts on milestones:
 |
-|   3 days before  -> "Due Soon"   notification + SMS
-|   1 day before   -> "Due Soon"   notification + SMS
+|   15 days before -> "Due Soon"   notification + SMS
+|   10 days before -> "Due Soon"   notification + SMS
+|   7..1 days      -> "Due Soon"   notification + SMS, every day
 |   due today      -> "Due Today"  notification + SMS
-|   1-3 days late  -> "Overdue"    notification + SMS (loan marked
+|   1-2 days late  -> "Overdue"    notification + SMS (loan marked
 |                     Overdue, mirroring the existing reminder flows)
 |
 | At most one notification + SMS per loan per milestone per day: an
@@ -48,7 +49,12 @@ const formatDate = (date) =>
   });
 
 const milestoneFor = (days) => {
-  if (days === 3 || days === 1) {
+  // Reminder pattern (product spec):
+  // - one reminder 15 days before the due date
+  // - one reminder 10 days before the due date
+  // - a reminder every day from 7 days before until the due date
+  // - a reminder on each of the 2 days after the due date (overdue)
+  if (days === 15 || days === 10 || (days >= 1 && days <= 7)) {
     return {
       type: "Due Soon",
       title: "Payment Due Soon",
@@ -62,7 +68,7 @@ const milestoneFor = (days) => {
     };
   }
 
-  if (days < 0 && days >= -3) {
+  if (days === -1 || days === -2) {
     return {
       type: "Overdue",
       title: "Payment Overdue",
