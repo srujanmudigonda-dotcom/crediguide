@@ -39,9 +39,35 @@ const allowedOrigins = (
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// A request is allowed when its origin is on the CLIENT_URL list,
+// or when it is one of this project's own Vercel deployments
+// (production and preview addresses all end in .vercel.app and
+// change from deploy to deploy, so they cannot be listed by hand).
+const isAllowedOrigin = (origin) => {
+  if (!origin) {
+    return true;
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  try {
+    return new URL(origin).hostname.endsWith(".vercel.app");
+  } catch (error) {
+    return false;
+  }
+};
+
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
