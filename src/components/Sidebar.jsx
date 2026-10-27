@@ -1,106 +1,65 @@
-import {
-  BarChart3,
-  Bell,
-  CreditCard,
-  Gauge,
-  Home,
-  Lightbulb,
-  User,
-  Wallet,
-} from "lucide-react";
-
 import { NavLink } from "react-router-dom";
 
 function Sidebar() {
   const menuItems = [
+    { name: "Dashboard", path: "/dashboard" },
+    { name: "Payments", path: "/payments" },
+    { name: "Loans", path: "/loans" },
     {
-      name: "Dashboard",
-      icon: Home,
-      path: "/dashboard",
+      name: "Credit Impact Simulator",
+      path: "/credit-impact",
     },
     {
-      name: "Credit Score",
-      icon: Gauge,
-      path: "/credit-score",
+      name: "EMI Default Risk Prediction",
+      path: "/emi-risk",
     },
     {
-      name: "Payments",
-      icon: CreditCard,
-      path: "/payments",
+      name: "AI Credit Report Explainer",
+      path: "/credit-report-explainer",
+    },
+    { name: "Score History", path: "/score-history" },
+    { name: "Improvement Plan", path: "/improvement-plan" },
+    {
+      name: "Repayment Advisor",
+      path: "/repayment-advisor",
     },
     {
-      name: "Loans & Dues",
-      icon: Wallet,
-      path: "/loans",
+      name: "Payment Prevention",
+      path: "/payment-prevention",
     },
-    {
-      name: "Score History",
-      icon: BarChart3,
-      path: "/score-history",
-    },
+    
     {
       name: "Notifications",
-      icon: Bell,
       path: "/notifications",
     },
+    { name: "Profile", path: "/profile" },
     {
-      name: "Improvement Plan",
-      icon: Lightbulb,
-      path: "/improvement-plan",
-    },
-    {
-      name: "Profile",
-      icon: User,
-      path: "/profile",
+      name: "AI Financial Assistant",
+      path: "/financial-assistant",
     },
   ];
 
   return (
-    <aside className="hidden min-h-screen w-64 border-r border-gray-200 bg-white lg:block">
-
+    <aside className="hidden min-h-[calc(100vh-64px)] w-64 shrink-0 bg-white shadow-sm md:block">
       <div className="p-4">
-
-        <p className="mb-4 px-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-          Main Menu
-        </p>
-
-        <nav className="space-y-1">
-
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <NavLink
-                key={item.name}
-                to={item.path}
-                className={({ isActive }) =>
-                  `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                    isActive
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon
-                      size={19}
-                      className={`transition-transform duration-200 group-hover:scale-110 ${
-                        isActive ? "text-white" : ""
-                      }`}
-                    />
-
-                    <span>{item.name}</span>
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
-
+        <nav className="space-y-2">
+          {menuItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition ${
+                  isActive
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                }`
+              }
+            >
+              <span>{item.name}</span>
+            </NavLink>
+          ))}
         </nav>
-
       </div>
-
     </aside>
   );
 }

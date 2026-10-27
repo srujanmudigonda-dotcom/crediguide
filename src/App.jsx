@@ -2,44 +2,40 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import VerifyOTP from "./pages/VerifyOTP";
 
 import Dashboard from "./pages/Dashboard";
-import CreditScorePage from "./pages/CreditScorePage";
 import Payments from "./pages/Payments";
-import ScoreHistory from "./pages/ScoreHistory";
-import Notifications from "./pages/Notifications";
-import ImprovementPlan from "./pages/ImprovementPlan";
-import Profile from "./pages/Profile";
 import Loans from "./pages/Loans";
+import CreditImpactSimulator from "./pages/CreditImpactSimulator";
+import EmiRiskPrediction from "./pages/EmiRiskPrediction";
+import CreditReportExplainer from "./pages/CreditReportExplainer";
+import ScoreHistory from "./pages/ScoreHistory";
+import ImprovementPlan from "./pages/ImprovementPlan";
+import RepaymentAdvisor from "./pages/RepaymentAdvisor";
+import PaymentPrevention from "./pages/PaymentPrevention";
+import Notifications from "./pages/Notifications";
+import Profile from "./pages/Profile";
+import FinancialChatbot from "./pages/FinancialChatbot";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* Public Pages */}
+        {/* Authentication */}
         <Route path="/" element={<Login />} />
-
         <Route path="/login" element={<Login />} />
-
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-otp" element={<VerifyOTP />} />
 
-        {/* Protected Pages */}
+        {/* Main Application */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/credit-score"
-          element={
-            <ProtectedRoute>
-              <CreditScorePage />
             </ProtectedRoute>
           }
         />
@@ -62,20 +58,40 @@ function App() {
           }
         />
 
+        {/* AI / Credit Features */}
         <Route
-          path="/score-history"
+          path="/credit-impact"
           element={
             <ProtectedRoute>
-              <ScoreHistory />
+              <CreditImpactSimulator />
             </ProtectedRoute>
           }
         />
 
         <Route
-          path="/notifications"
+          path="/emi-risk"
           element={
             <ProtectedRoute>
-              <Notifications />
+              <EmiRiskPrediction />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/credit-report-explainer"
+          element={
+            <ProtectedRoute>
+              <CreditReportExplainer />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Credit Management */}
+        <Route
+          path="/score-history"
+          element={
+            <ProtectedRoute>
+              <ScoreHistory />
             </ProtectedRoute>
           }
         />
@@ -90,6 +106,34 @@ function App() {
         />
 
         <Route
+          path="/repayment-advisor"
+          element={
+            <ProtectedRoute>
+              <RepaymentAdvisor />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/payment-prevention"
+          element={
+            <ProtectedRoute>
+              <PaymentPrevention />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Other Features */}
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <Notifications />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/profile"
           element={
             <ProtectedRoute>
@@ -98,6 +142,14 @@ function App() {
           }
         />
 
+        <Route
+          path="/financial-assistant"
+          element={
+            <ProtectedRoute>
+              <FinancialChatbot />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

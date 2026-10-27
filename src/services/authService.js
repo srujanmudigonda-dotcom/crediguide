@@ -1,97 +1,178 @@
-import { supabase } from "../lib/supabaseClient";
+import api from "./api";
 
 /*
 |--------------------------------------------------------------------------
-| CrediGuide auth — Supabase Auth (email + password only, no OTP)
+| Register
 |--------------------------------------------------------------------------
-| Registration creates the auth account; a database trigger
-| (public.handle_new_user) creates the matching profile row and
-| takes the full name from the sign-up metadata below.
 */
 
-const register = async ({ fullName, email, password }) => {
-  const { data, error } = await supabase.auth.signUp({
-    email: email.trim().toLowerCase(),
-    password,
-    options: {
-      data: { full_name: fullName.trim() },
-    },
-  });
+const register = async (userData) => {
+  const response = await api.post(
+    "/auth/register",
+    userData
+  );
 
-  if (error) {
-    throw new Error(error.message);
+  return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Verify Registration OTP
+|--------------------------------------------------------------------------
+*/
+
+const verifyOTP = async (email, otp) => {
+  const response = await api.post(
+    "/auth/verify-otp",
+    {
+      email,
+      otp,
+    }
+  );
+
+  return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Resend Registration OTP
+|--------------------------------------------------------------------------
+*/
+
+const resendOTP = async (email) => {
+  const response = await api.post(
+    "/auth/resend-otp",
+    {
+      email,
+    }
+  );
+
+  return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Login - Step 1
+|--------------------------------------------------------------------------
+|
+| Checks email + password and generates a login OTP.
+|
+*/
+
+const login = async (credentials) => {
+  const response = await api.post(
+    "/auth/login",
+    credentials
+  );
+
+  return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Login - Step 2
+|--------------------------------------------------------------------------
+|
+| Verifies the login OTP and stores the JWT.
+|
+*/
+
+const verifyLoginOTP = async (email, otp) => {
+  const response = await api.post(
+    "/auth/verify-login-otp",
+    {
+      email,
+      otp,
+    }
+  );
+
+  if (
+    response.data?.success &&
+    response.data?.token
+  ) {
+    localStorage.setItem(
+      "creditGuideToken",
+      response.data.token
+    );
+
+    localStorage.setItem(
+      "creditGuideUser",
+      JSON.stringify(response.data.user)
+    );
+
+    localStorage.setItem(
+      "creditGuideLoggedIn",
+      "true"
+    );
   }
 
-  return {
-    success: true,
-    user: data.user,
-    session: data.session,
-  };
+  return response.data;
 };
 
-const login = async ({ email, password }) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
-    password,
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return {
-    success: true,
-    user: data.user,
-    session: data.session,
-  };
-};
-
-const logout = async () => {
-  await supabase.auth.signOut();
-};
-
-const getSession = async () => {
-  const { data } = await supabase.auth.getSession();
-  return data.session;
-};
+/*
+|--------------------------------------------------------------------------
+| Get Profile
+|--------------------------------------------------------------------------
+*/
 
 const getProfile = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const response = await api.get(
+    "/auth/profile"
+  );
 
-  if (!user) {
-    throw new Error("Not authenticated");
-  }
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return {
-    success: true,
-    user: {
-      id: data.id,
-      fullName: data.full_name,
-      email: data.email,
-      isEmailVerified: true,
-      createdAt: data.created_at,
-    },
-  };
+  return response.data;
 };
+
+/*
+|--------------------------------------------------------------------------
+| Update Profile
+|--------------------------------------------------------------------------
+*/
+
+const updateProfile = async (profileData) => {
+  const response = await api.put(
+    "/auth/profile",
+    profileData
+  );
+
+  return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Logout
+|--------------------------------------------------------------------------
+*/
+
+const logout = () => {
+  localStorage.removeItem(
+    "creditGuideToken"
+  );
+
+  localStorage.removeItem(
+    "creditGuideUser"
+  );
+
+  localStorage.removeItem(
+    "creditGuideLoggedIn"
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
+| Export
+|--------------------------------------------------------------------------
+*/
 
 const authService = {
   register,
+  verifyOTP,
+  resendOTP,
   login,
-  logout,
-  getSession,
+  verifyLoginOTP,
   getProfile,
+  updateProfile,
+  logout,
 };
 
 export default authService;

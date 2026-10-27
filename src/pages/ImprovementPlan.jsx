@@ -1,169 +1,302 @@
 import { useEffect, useState } from "react";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
-import { getImprovementPlan } from "../services/creditService";
+import api from "../services/api";
 
-const genericActions = [
-  {
-    title: "Pay bills before the due date",
-    description:
-      "Make credit card and EMI payments on or before their due dates to maintain a consistent payment history.",
-  },
-  {
-    title: "Manage credit utilization",
-    description:
-      "Keep your outstanding credit card balances at a manageable level compared with your available credit.",
-  },
-  {
-    title: "Avoid unnecessary credit applications",
-    description:
-      "Apply for new credit only when needed and avoid making multiple applications within a short period.",
-  },
-  {
-    title: "Monitor your credit report",
-    description:
-      "Regularly review your credit information and check for unfamiliar or incorrect account information.",
-  },
-];
-
-const priorityStyles = {
-  High: "bg-red-100 text-red-600",
-  Medium: "bg-orange-100 text-orange-600",
-  Low: "bg-green-100 text-green-600",
-};
-
-function ImprovementPlan() {
-  const [plan, setPlan] = useState([]);
-  const [timeline, setTimeline] = useState("");
-  const [personalized, setPersonalized] = useState(false);
+function ImprovementPlanCard() {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
+    const loadPlan = async () => {
       try {
-        const response = await getImprovementPlan();
+        setLoading(true);
 
-        if (response.success && response.plan?.length > 0) {
-          setPlan(response.plan);
-          setTimeline(response.estimatedTimeline || "");
-          setPersonalized(true);
-        } else {
-          setPlan(genericActions);
+        const [historyResponse, loansResponse] =
+          await Promise.all([
+            api.get("/credit-score/history"),
+            api.get("/loans"),
+          ]);
+
+        const historyData = historyResponse.data;
+        const loansData = loansResponse.data;
+
+        /*
+          Get the latest simulated score from score history.
+          Different backend responses are handled safely here.
+        */
+        const scoreHistory =
+          historyData?.history ||
+          historyData?.scoreHistory ||
+          historyData?.data?.history ||
+          historyData?.data?.scoreHistory ||
+          [];
+
+        const latestHistory =
+          scoreHistory.length > 0
+            ? scoreHistory[scoreHistory.length - 1]
+            : null;
+
+        const currentScore = Number(
+          historyData?.currentScore ??
+            historyData?.score ??
+            historyData?.data?.currentScore ??
+            latestHistory?.newScore ??
+            0
+        );
+
+        const loans = loansData?.loans || [];
+
+        let onTimePayments = 0;
+        let latePayments = 0;
+        let missedPayments = 0;
+        let totalOutstanding = 0;
+
+        loans.forEach((loan) => {
+          onTimePayments += Number(
+            loan.onTimePayments || 0
+          );
+
+          latePayments += Number(
+            loan.latePayments || 0
+          );
+
+          missedPayments += Number(
+            loan.missedPayments || 0
+          );
+
+          totalOutstanding += Number(
+            loan.outstandingAmount || 0
+          );
+        });
+
+        const recommendations = [];
+
+        if (missedPayments > 0) {
+          recommendations.push({
+            title: "Avoid missed payments",
+            priority: "High",
+            description:
+              "You have missed payment activity. Make every future EMI payment on or before the due date to prevent further decreases in your simulated score.",
+          });
         }
+
+        if (latePayments > 0) {
+          recommendations.push({
+            title: "Reduce late payments",
+            priority: "High",
+            description:
+              "Your payment history contains late payments. Try to pay before the due date and set reminders several days in advance.",
+          });
+        }
+
+        const creditCards = loans.filter(
+          (loan) =>
+            loan.loanType === "Credit Card" &&
+            Number(loan.creditUtilization || 0) >= 30
+        );
+
+        if (creditCards.length > 0) {
+          recommendations.push({
+            title: "Reduce credit utilization",
+            priority: "Medium",
+            description:
+              "Your credit card utilization is relatively high. Reducing outstanding balances can help maintain healthier simulated credit behavior.",
+          });
+        }
+
+        if (totalOutstanding > 0) {
+          recommendations.push({
+            title: "Reduce outstanding balances",
+            priority: "Medium",
+            description: `You currently have approximately ₹${totalOutstanding.toLocaleString(
+              "en-IN"
+            )} in outstanding loan balances. Continue covering all required EMIs and consider reducing outstanding debt when financially possible.`,
+          });
+        }
+
+        recommendations.push({
+          title: "Maintain on-time payments",
+          priority: "Medium",
+          description:
+            "Continue making all EMI and minimum-due payments on or before their due dates. Consistent positive payment behavior is important in this educational simulation.",
+        });
+
+        if (currentScore > 0 && currentScore < 700) {
+          recommendations.push({
+            title: "Build consistent credit behavior",
+            priority: "Medium",
+            description:
+              "Your simulated score is below 700. Focus on consistent on-time payments, avoiding missed payments, and gradually reducing outstanding balances.",
+          });
+        } else if (
+          currentScore >= 700 &&
+          currentScore < 750
+        ) {
+          recommendations.push({
+            title: "Strengthen your credit behavior",
+            priority: "Medium",
+            description:
+              "Your simulated score is in a moderate range. Continue making payments on time and avoid unnecessary increases in outstanding debt.",
+          });
+        } else if (currentScore >= 750) {
+          recommendations.push({
+            title: "Maintain healthy credit behavior",
+            priority: "Low",
+            description:
+              "Your simulated score is in a stronger range. Continue making payments on time and maintain responsible borrowing behavior.",
+          });
+        }
+
+        setData({
+          currentScore,
+          onTimePayments,
+          latePayments,
+          missedPayments,
+          recommendations,
+        });
       } catch (error) {
-        console.error("Improvement Plan Error:", error);
-        setPlan(genericActions);
+        console.error(
+          "Improvement Plan Error:",
+          error
+        );
+
+        setData({
+          currentScore: 0,
+          onTimePayments: 0,
+          latePayments: 0,
+          missedPayments: 0,
+          recommendations: [
+            {
+              title: "Maintain on-time payments",
+              priority: "Medium",
+              description:
+                "Continue making your loan payments on or before their due dates to maintain positive simulated credit behavior.",
+            },
+          ],
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    load();
+    loadPlan();
   }, []);
 
-  return (
-    <div className="min-h-screen bg-slate-100">
-      <Navbar />
+  if (loading) {
+    return (
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex min-h-[260px] items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
 
-      <div className="flex">
-        <Sidebar />
-
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl">
-            {/* Header */}
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-gray-800">
-                Improvement Plan
-              </h2>
-
-              <p className="mt-2 text-gray-500">
-                {personalized
-                  ? "A plan generated from your current credit health factors."
-                  : "Follow these actions to support healthier credit behavior."}
-              </p>
-            </div>
-
-            {/* Summary */}
-            <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-700">
-                  Your Action Plan
-                </h3>
-
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    personalized
-                      ? "bg-green-100 text-green-600"
-                      : "bg-blue-100 text-blue-600"
-                  }`}
-                >
-                  {personalized ? "Personalized" : "General Guidance"}
-                </span>
-              </div>
-
-              <p className="mt-3 text-sm leading-6 text-gray-500">
-                {personalized
-                  ? "These actions are selected from your latest credit score factors, with the highest-impact items first."
-                  : "General credit-health guidance. Once credit data is available for your account, this plan is generated from your own credit factors."}
-              </p>
-            </div>
-
-            {/* Actions */}
-            {loading ? (
-              <div className="flex items-center justify-center rounded-2xl bg-white p-12 shadow-sm">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {plan.map((action, index) => (
-                  <div
-                    key={action.title}
-                    className="flex gap-4 rounded-2xl bg-white p-6 shadow-sm"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                      {index + 1}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="font-semibold text-gray-800">
-                          {action.title}
-                        </h4>
-
-                        {action.priority && (
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${priorityStyles[action.priority] || "bg-gray-100 text-gray-600"}`}
-                          >
-                            {action.priority} priority
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="mt-1.5 text-sm leading-6 text-gray-500">
-                        {action.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Timeline note */}
-            <div className="mt-6 rounded-2xl bg-blue-50 p-6">
-              <p className="text-sm font-semibold text-blue-700">
-                Estimated improvement period
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-blue-600">
-                {timeline ||
-                  "Positive credit behavior can take time to appear in credit information. The actual timing varies by individual and reporting cycles."}
-              </p>
-            </div>
+            <p className="mt-4 text-sm font-medium text-gray-500">
+              Preparing your improvement plan...
+            </p>
           </div>
-        </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-700">
+          Credit Improvement Plan
+        </h3>
+
+        <p className="mt-1 text-sm text-gray-400">
+          Personalized recommendations based on your simulated score,
+          loans and payment behavior.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <p className="text-xs font-medium text-gray-500">
+            Simulated Score
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-gray-800">
+            {data.currentScore || "—"}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-green-100 bg-green-50 p-4">
+          <p className="text-xs font-medium text-green-700">
+            On-Time Payments
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-green-700">
+            {data.onTimePayments}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-yellow-100 bg-yellow-50 p-4">
+          <p className="text-xs font-medium text-yellow-700">
+            Late Payments
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-yellow-700">
+            {data.latePayments}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+          <p className="text-xs font-medium text-red-700">
+            Missed Payments
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-red-700">
+            {data.missedPayments}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {data.recommendations.map((item, index) => (
+          <div
+            key={`${item.title}-${index}`}
+            className="rounded-xl border border-gray-200 p-4"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <h4 className="font-semibold text-gray-800">
+                {item.title}
+              </h4>
+
+              <span
+                className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                  item.priority === "High"
+                    ? "bg-red-50 text-red-600"
+                    : item.priority === "Medium"
+                    ? "bg-yellow-50 text-yellow-600"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {item.priority}
+              </span>
+            </div>
+
+            <p className="mt-2 text-sm leading-6 text-gray-500">
+              {item.description}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 rounded-lg border border-blue-100 bg-blue-50 p-4">
+        <p className="text-xs leading-5 text-blue-700">
+          CrediGuide provides an educational simulation based on your
+          starting score, loans and recorded payment behavior. This is
+          not your actual TransUnion CIBIL score and does not use the
+          proprietary CIBIL scoring formula.
+        </p>
       </div>
     </div>
   );
 }
 
-export default ImprovementPlan;
+export default ImprovementPlanCard;

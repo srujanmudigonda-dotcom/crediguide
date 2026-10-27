@@ -5,100 +5,197 @@ import {
   useState,
 } from "react";
 
-import { supabase } from "../lib/supabaseClient";
 import authService from "../services/authService";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(() => {
+    const storedUser =
+      localStorage.getItem("creditGuideUser");
+
+    try {
+      return storedUser
+        ? JSON.parse(storedUser)
+        : null;
+    } catch (error) {
+      console.error(
+        "Failed to read stored user:",
+        error
+      );
+
+      return null;
+    }
+  });
+
+  const [isAuthenticated, setIsAuthenticated] =
+    useState(() => {
+      return Boolean(
+        localStorage.getItem("creditGuideToken")
+      );
+    });
+
   const [loading, setLoading] = useState(true);
 
   /*
   |--------------------------------------------------------------------------
-  | Load the profile for the signed-in user
-  |--------------------------------------------------------------------------
-  */
-
-  const loadProfile = async () => {
-    try {
-      const response = await authService.getProfile();
-
-      if (response?.success && response?.user) {
-        setUser(response.user);
-        setIsAuthenticated(true);
-        return response.user;
-      }
-    } catch (error) {
-      console.error("Profile load failed:", error);
-    }
-
-    setUser(null);
-    setIsAuthenticated(false);
-    return null;
-  };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Session bootstrap + live session changes (Supabase Auth)
+  | Check Existing Authentication
   |--------------------------------------------------------------------------
   */
 
   useEffect(() => {
     let isMounted = true;
 
-    const bootstrap = async () => {
-      const session = await authService.getSession();
+    const loadUser = async () => {
+      const token =
+        localStorage.getItem(
+          "creditGuideToken"
+        );
 
-      if (!isMounted) return;
+      if (!token) {
+        if (isMounted) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setLoading(false);
+        }
 
-      if (session) {
-        await loadProfile();
-      } else {
-        setUser(null);
-        setIsAuthenticated(false);
+        return;
       }
 
       if (isMounted) {
-        setLoading(false);
+        setIsAuthenticated(true);
+      }
+
+      try {
+        const response =
+          await authService.getProfile();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (
+          response?.success &&
+          response?.user
+        ) {
+          setUser(response.user);
+          setIsAuthenticated(true);
+
+          localStorage.setItem(
+            "creditGuideUser",
+            JSON.stringify(response.user)
+          );
+
+          localStorage.setItem(
+            "creditGuideLoggedIn",
+            "true"
+          );
+        } else {
+          authService.logout();
+
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        console.error(
+          "Authentication check failed:",
+          error
+        );
+
+        if (
+          error.response?.status === 401
+        ) {
+          authService.logout();
+
+          setUser(null);
+          setIsAuthenticated(false);
+        } else {
+          /*
+           * Keep the current authentication state if
+           * the server is temporarily unavailable.
+           */
+          setIsAuthenticated(true);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    bootstrap();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
-
-      if (session) {
-        await loadProfile();
-      } else {
-        setUser(null);
-        setIsAuthenticated(false);
-      }
-
-      setLoading(false);
-    });
+    loadUser();
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
     };
   }, []);
 
   /*
   |--------------------------------------------------------------------------
-  | Login — email + password
+  | Login - Step 1
   |--------------------------------------------------------------------------
+  |
+  | Sends email + password to backend.
+  | Backend generates login OTP.
+  |
+  | IMPORTANT:
+  | No JWT is stored here.
+  |
   */
 
   const login = async (credentials) => {
-    const response = await authService.login(credentials);
+    return await authService.login(
+      credentials
+    );
+  };
 
-    if (response?.success) {
-      await loadProfile();
+  /*
+  |--------------------------------------------------------------------------
+  | Login - Step 2
+  |--------------------------------------------------------------------------
+  |
+  | Verifies login OTP.
+  | Backend returns JWT after successful verification.
+  |
+  */
+
+  const verifyLoginOTP = async (
+    email,
+    otp
+  ) => {
+    const response =
+      await authService.verifyLoginOTP(
+        email,
+        otp
+      );
+
+    if (
+      response?.success &&
+      response?.token
+    ) {
+      setUser(response.user);
+      setIsAuthenticated(true);
+
+      localStorage.setItem(
+        "creditGuideToken",
+        response.token
+      );
+
+      localStorage.setItem(
+        "creditGuideUser",
+        JSON.stringify(
+          response.user
+        )
+      );
+
+      localStorage.setItem(
+        "creditGuideLoggedIn",
+        "true"
+      );
     }
 
     return response;
@@ -106,20 +203,42 @@ export const AuthProvider = ({ children }) => {
 
   /*
   |--------------------------------------------------------------------------
-  | Registration — name + email + password
+  | Registration
   |--------------------------------------------------------------------------
   */
 
   const register = async (userData) => {
-    const response = await authService.register(userData);
+    return await authService.register(
+      userData
+    );
+  };
 
-    // If email confirmation is disabled, sign-up returns a live
-    // session and the new user is signed in immediately.
-    if (response?.session) {
-      await loadProfile();
-    }
+  /*
+  |--------------------------------------------------------------------------
+  | Registration OTP Verification
+  |--------------------------------------------------------------------------
+  */
 
-    return response;
+  const verifyOTP = async (
+    email,
+    otp
+  ) => {
+    return await authService.verifyOTP(
+      email,
+      otp
+    );
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Resend Registration OTP
+  |--------------------------------------------------------------------------
+  */
+
+  const resendOTP = async (email) => {
+    return await authService.resendOTP(
+      email
+    );
   };
 
   /*
@@ -128,12 +247,18 @@ export const AuthProvider = ({ children }) => {
   |--------------------------------------------------------------------------
   */
 
-  const logout = async () => {
-    await authService.logout();
+  const logout = () => {
+    authService.logout();
 
     setUser(null);
     setIsAuthenticated(false);
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Context Value
+  |--------------------------------------------------------------------------
+  */
 
   const value = {
     user,
@@ -141,7 +266,12 @@ export const AuthProvider = ({ children }) => {
     loading,
 
     login,
+    verifyLoginOTP,
+
     register,
+    verifyOTP,
+    resendOTP,
+
     logout,
   };
 
