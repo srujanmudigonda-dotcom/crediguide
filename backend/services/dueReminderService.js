@@ -100,31 +100,34 @@ const inAppMessage = (loan, days, milestone) => {
   );
 };
 
+/*
+| SMS wording is deliberately FIXED and generic: it never contains the
+| loan name, an amount, or payment-urgency phrases. Fast2SMS's spam
+| filter rejects messages that read like bank payment demands (a loan
+| named e.g. "hdfc credit card" made the old template undeliverable),
+| so user-entered text must never reach the SMS body. The loan details
+| live in the in-app notification, which has no such filter. All three
+| templates below were verified deliverable on the Quick route.
+*/
 const smsMessage = (loan, days, milestone) => {
-  const amount = loan.emiAmount
-    ? ` of Rs.${loan.emiAmount}`
-    : "";
-  const dueText = `payment${amount} for ${loan.loanName}`;
-
   if (milestone.type === "Due Soon") {
     return (
-      `CrediGuide reminder: Your ${dueText} is due on ` +
+      "CrediGuide reminder: Your upcoming due date is " +
       `${formatDate(loan.dueDate)} (${days} day${days === 1 ? "" : "s"} left). ` +
-      "Please keep the amount ready."
+      "Open the CrediGuide app to see the details."
     );
   }
 
   if (milestone.type === "Due Today") {
     return (
-      `CrediGuide reminder: Your ${dueText} is due today, ` +
-      `${formatDate(loan.dueDate)}. Please pay on time to protect your credit score.`
+      `CrediGuide reminder: Today, ${formatDate(loan.dueDate)}, is a due ` +
+      "date on your account. Open the CrediGuide app to see the details."
     );
   }
 
   return (
-    `CrediGuide alert: Your ${dueText} was due on ` +
-    `${formatDate(loan.dueDate)} and is now overdue. ` +
-    "Please pay immediately to avoid further impact on your credit score."
+    "CrediGuide reminder: A due date on your account has passed " +
+    `(${formatDate(loan.dueDate)}). Open the CrediGuide app to see the details.`
   );
 };
 
