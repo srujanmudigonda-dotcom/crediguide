@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 
 import authService from "../services/authService";
+import { getCreditScore } from "../services/creditService";
 
 function Profile() {
   const [profile, setProfile] = useState(null);
+  const [simulatedScore, setSimulatedScore] = useState(null);
   const [formData, setFormData] = useState({
     fullName: "",
     mobileNumber: "",
@@ -49,6 +51,18 @@ function Profile() {
             "creditGuideUser",
             JSON.stringify(response.user)
           );
+
+          // Best-effort: also load the live simulated score so the
+          // profile shows both the entered score and the current one.
+          try {
+            const scoreResponse = await getCreditScore();
+
+            if (scoreResponse?.success) {
+              setSimulatedScore(scoreResponse.currentScore);
+            }
+          } catch (scoreError) {
+            // Simulated score is optional on this page.
+          }
         } else {
           setError("Unable to load profile information.");
         }
@@ -256,6 +270,34 @@ function Profile() {
                       Edit Profile
                     </button>
                   )}
+                </div>
+
+                {/* Credit Score Summary */}
+                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-gray-50 p-4 text-center">
+                    <p className="text-xs font-medium text-gray-400">
+                      CIBIL Score (entered at registration)
+                    </p>
+
+                    <p className="mt-1 text-2xl font-bold text-gray-700">
+                      {profile.currentCibilScore ?? "—"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-50 p-4 text-center">
+                    <p className="text-xs font-medium text-gray-400">
+                      Current Simulated Score
+                    </p>
+
+                    <p className="mt-1 text-2xl font-bold text-gray-700">
+                      {simulatedScore ?? "—"}
+                    </p>
+
+                    <p className="mt-1 text-xs text-gray-400">
+                      Changes with your loans and payments — see
+                      the dashboard for details.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Edit Form */}

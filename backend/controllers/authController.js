@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOTP: dispatchSMSOTP } = require("../services/smsService");
+const { ensureScoreProfile } = require("../utils/scoreProfile");
 
 // ==========================================
 // GENERATE OTP
@@ -181,6 +182,17 @@ const registerUser = async (req, res) => {
         message:
           "Account could not be created because the OTP could not be sent. Please try again.",
       });
+    }
+
+    // Create the simulated credit score profile right away, so the
+    // dashboard shows the score the user entered from day one.
+    try {
+      await ensureScoreProfile(user._id);
+    } catch (scoreError) {
+      console.error(
+        "Score profile creation failed:",
+        scoreError.message
+      );
     }
 
     console.log(

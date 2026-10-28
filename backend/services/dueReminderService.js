@@ -1,6 +1,10 @@
 const Loan = require("../models/Loan");
 const Notification = require("../models/Notification");
 const { sendNotificationSMS } = require("./smsService");
+const {
+  ensureScoreProfile,
+  applyScoreChange,
+} = require("../utils/scoreProfile");
 
 /*
 |--------------------------------------------------------------------------
@@ -138,6 +142,7 @@ const runDueReminderScan = async ({ onlyUserId } = {}) => {
     smsSent: 0,
     smsFailed: 0,
     skippedDuplicates: 0,
+    scorePenaltiesApplied: 0,
   };
 
   const query = {
@@ -163,6 +168,74 @@ const runDueReminderScan = async ({ onlyUserId } = {}) => {
       }
 
       const days = daysUntil(loan.dueDate);
+
+      // --------------------------------------
+      // MISSED DUE DATE -> SIMULATED SCORE PENALTY
+      // The first time the scan finds a loan past its
+      // due date, apply -20 ("EMI Missed") exactly once
+      // per due-date cycle. A marker in the history entry
+      // (and any manual "EMI Missed" entry for the same
+      // cycle) makes repeat scans skip it.
+      // --------------------------------------
+      if (days < 0) {
+        try {
+          const dueKey = new Date(loan.dueDate)
+            .toISOString()
+            .slice(0, 10);
+          const marker = `auto-missed:${loan._id}:${dueKey}`;
+
+          const profile = await ensureScoreProfile(
+            loan.user._id
+          );
+
+          const alreadyPenalised =
+            profile &&
+            (profile.scoreHistory || []).some(
+              (entry) =>
+                (entry.notes &&
+                  entry.notes.includes(marker)) ||
+                (entry.action === "EMI Missed" &&
+                  entry.loanName === loan.loanName &&
+                  new Date(entry.date) >= new Date(dueKey))
+            );
+
+          if (profile && !alreadyPenalised) {
+            const result = await applyScoreChange({
+              userId: loan.user._id,
+              change: -20,
+              action: "EMI Missed",
+              loanName: loan.loanName,
+              amount: Number(
+                loan.emiAmount || loan.minimumDue || 0
+              ),
+              notes:
+                `Due date ${dueKey} was missed (auto-detected by the daily scan). ` +
+                marker,
+            });
+
+            if (result) {
+              summary.scorePenaltiesApplied += 1;
+
+              await Notification.create({
+                user: loan.user._id,
+                loan: loan._id,
+                type: "Score",
+                title: "Simulated Score Decreased",
+                message:
+                  `A missed due date on ${loan.loanName} reduced your simulated credit score by 20 points. ` +
+                  `Your current simulated score is ${result.newScore}.`,
+                isRead: false,
+              });
+            }
+          }
+        } catch (penaltyError) {
+          console.error(
+            `Missed-due score penalty failed for loan ${loan._id}:`,
+            penaltyError.message
+          );
+        }
+      }
+
       const milestone = milestoneFor(days);
 
       if (!milestone) {
