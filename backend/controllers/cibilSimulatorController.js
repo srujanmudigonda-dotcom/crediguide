@@ -1,4 +1,4 @@
-const CibilSimulator = require("../models/CibilSimulator");
+const { ensureScoreProfile } = require("../utils/scoreProfile");
 
 /*
 |--------------------------------------------------------------------------
@@ -14,9 +14,10 @@ const getCibilSimulator = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
 
-    const simulator = await CibilSimulator.findOne({
-      user: userId,
-    });
+    // Self-heal: profiles are created at registration, but accounts
+    // registered earlier may not have one yet - create it on the spot
+    // from the CIBIL score stored on the user.
+    const simulator = await ensureScoreProfile(userId);
 
     if (!simulator) {
       return res.status(404).json({

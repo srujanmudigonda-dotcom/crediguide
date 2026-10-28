@@ -1,4 +1,4 @@
-const CibilSimulator = require("../models/CibilSimulator");
+const { ensureScoreProfile } = require("../utils/scoreProfile");
 
 /*
 |--------------------------------------------------------------------------
@@ -8,9 +8,7 @@ const CibilSimulator = require("../models/CibilSimulator");
 
 const getCreditScore = async (req, res) => {
   try {
-    const simulator = await CibilSimulator.findOne({
-      user: req.user._id,
-    });
+    const simulator = await ensureScoreProfile(req.user._id);
 
     if (!simulator) {
       return res.status(404).json({
@@ -65,9 +63,7 @@ const getCreditScore = async (req, res) => {
 
 const getCreditScoreHistory = async (req, res) => {
   try {
-    const simulator = await CibilSimulator.findOne({
-      user: req.user._id,
-    });
+    const simulator = await ensureScoreProfile(req.user._id);
 
     if (!simulator) {
       return res.status(404).json({
@@ -105,9 +101,7 @@ const getCreditScoreHistory = async (req, res) => {
 
 const getImprovementPlan = async (req, res) => {
   try {
-    const simulator = await CibilSimulator.findOne({
-      user: req.user._id,
-    });
+    const simulator = await ensureScoreProfile(req.user._id);
 
     if (!simulator) {
       return res.status(404).json({

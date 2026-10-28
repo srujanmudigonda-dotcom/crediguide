@@ -3,6 +3,7 @@ const Loan = require("../models/Loan");
 const CibilSimulator = require("../models/CibilSimulator");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const { applyScoreChange } = require("../utils/scoreProfile");
 
 // ==========================================
 // HELPER: CALCULATE CREDIT CARD UTILIZATION
@@ -240,6 +241,46 @@ const createLoan = async (req, res) => {
           : true,
       notes: notes || "",
     });
+
+    // --------------------------------------
+    // SYNC WITH SCORE PROFILE + NEW LOAN IMPACT
+    // Taking new credit lowers the simulated score
+    // briefly (-10), like a real credit enquiry.
+    // --------------------------------------
+    try {
+      await syncLoanToScoreProfile(userId, loan);
+
+      if (loan.status === "Active") {
+        const result = await applyScoreChange({
+          userId,
+          change: -10,
+          action: "Loan Added",
+          loanName: loan.loanName,
+          amount: parsedTotalAmount,
+          notes:
+            "New loan added. Taking new credit usually lowers the score for a short period.",
+        });
+
+        if (result) {
+          await Notification.create({
+            user: userId,
+            loan: loan._id,
+            type: "Score",
+            title: "Simulated Score Updated",
+            message:
+              `Adding ${loan.loanName} lowered your simulated credit score by 10 points. ` +
+              `Your current simulated score is ${result.newScore}. ` +
+              "Paying EMIs on time will build it back up.",
+            isRead: false,
+          });
+        }
+      }
+    } catch (scoreError) {
+      console.error(
+        "Score update on loan creation failed:",
+        scoreError.message
+      );
+    }
 
     return res.status(201).json({
       success: true,
@@ -515,6 +556,8 @@ const recordLoanPayment = async (req, res) => {
       });
     }
 
+    const wasAlreadyPaid = loan.status === "Paid";
+
     const {
       paymentDate,
       amount,
@@ -746,6 +789,45 @@ const recordLoanPayment = async (req, res) => {
     // --------------------------------------
 
     await scoreProfile.save();
+
+    // --------------------------------------
+    // LOAN COMPLETED BONUS
+    // Closing a loan in good standing gives an
+    // extra +15, once, when it becomes fully Paid.
+    // --------------------------------------
+
+    if (loan.status === "Paid" && !wasAlreadyPaid) {
+      try {
+        const bonus = await applyScoreChange({
+          userId,
+          change: 15,
+          action: "Loan Completed",
+          loanName: loan.loanName,
+          amount: paymentAmount,
+          notes:
+            "Loan fully paid and closed. Closing a loan in good standing improves the score.",
+        });
+
+        if (bonus) {
+          await Notification.create({
+            user: userId,
+            loan: loan._id,
+            type: "Score",
+            title: "Loan Completed",
+            message:
+              `Congratulations! ${loan.loanName} is fully paid. ` +
+              "Your simulated credit score increased by 15 points. " +
+              `Your current simulated score is ${bonus.newScore}.`,
+            isRead: false,
+          });
+        }
+      } catch (bonusError) {
+        console.error(
+          "Loan completion bonus failed:",
+          bonusError.message
+        );
+      }
+    }
 
     // --------------------------------------
     // PAYMENT NOTIFICATION

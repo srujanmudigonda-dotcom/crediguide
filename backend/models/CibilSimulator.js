@@ -97,6 +97,7 @@ const scoreHistorySchema = new mongoose.Schema(
       type: String,
       enum: [
         "Starting Score",
+        "Loan Added",
         "EMI Paid",
         "Loan Completed",
         "EMI Missed",
