@@ -7,7 +7,7 @@ const { runDueReminderScan } = require("../services/dueReminderService");
 | Due Reminder Cron Job
 |--------------------------------------------------------------------------
 |
-| Runs the due reminder scan once a day at 09:00 (Asia/Kolkata):
+| Runs the due reminder scan once a day at 10:30 AM (Asia/Kolkata):
 | loans due in 3 days, 1 day, today, or newly overdue get an in-app
 | notification and an SMS reminder to the registered mobile number.
 |
@@ -30,7 +30,7 @@ const startDueReminderJob = () => {
   }
 
   cron.schedule(
-    "0 9 * * *",
+    "30 10 * * *",
     async () => {
       try {
         const summary = await runDueReminderScan();
@@ -46,7 +46,7 @@ const startDueReminderJob = () => {
   started = true;
 
   console.log(
-    "Due reminder job scheduled: daily at 09:00 Asia/Kolkata."
+    "Due reminder job scheduled: daily at 10:30 Asia/Kolkata."
   );
 };
 
